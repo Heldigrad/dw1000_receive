@@ -1,9 +1,15 @@
+//*********************************************/
+// TX
+//*********************************************/
+
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(dw1000_spi, LOG_LEVEL_DBG);
+
+#define SLEEP_TIME_MS 1000
 
 // SPI Configuration
 #define DW1000_SPI_FREQUENCY 2000000                    // 2 MHz
@@ -76,7 +82,7 @@ int dw1000_spi_read(const struct device *spi_dev, uint8_t reg, uint8_t *data, si
     }
 
     // Log the received data
-    LOG_INF("SPI read successful. Register 0x%02X: ", reg);
+    LOG_INF("SPI read successful. Data from register 0x%X: ", reg);
     for (size_t i = 1; i < len; i++)
     {
         LOG_INF("Byte %zu: 0x%02X", i - 1, data[i]);
@@ -111,68 +117,47 @@ int main(void)
     LOG_INF("CS GPIO configured...");
 
     gpio_pin_set_dt(&reset_gpio, 0);
-    // LOG_INF("Starting SPI transmission...");
+    k_msleep(2);
     gpio_pin_set_dt(&reset_gpio, 1);
+    k_msleep(5);
+
     while (1)
     {
+        LOG_INF("\n[TX]");
 
-        // write the data to transmit
-        // address: TX_BUFFER = 0x09
-        uint8_t tx_data[3] = {0x01, 0x02, 0x03}; // Data to be transmitted
-        uint8_t rx_data[4] = {0};
+        // Read and verify Device ID
+        uint8_t dev_id[4] = {0};
+        dw1000_spi_read(spi_dev, 0x00, dev_id, sizeof(dev_id));
 
-        ret = dw1000_spi_write(spi_dev, 0x09, tx_data, sizeof(tx_data));
-        if (ret == 0)
+        // Transmit Data
+        uint8_t tx_data[4] = {0xDE, 0xDE, 0xDE, 0xDE};             // Example payload
+        dw1000_spi_write(spi_dev, 0x09, tx_data, sizeof(tx_data)); // Write to TX_BUFFER (0x09)
+
+        uint8_t chan_ctrl[4] = {0x25, 0x00, 0x00, 0x00}; // Channel 5, Preamble Code 3
+        dw1000_spi_write(spi_dev, 0x1F, chan_ctrl, sizeof(chan_ctrl));
+
+        // Configure transmission settings (TRANSMIT FRAME CONTROL = 0x08)
+        uint8_t tx_fctrl[4] = {0x06, 0x00, 0x42, 0x00}; // Correct frame length
+        dw1000_spi_write(spi_dev, 0x08, tx_fctrl, sizeof(tx_fctrl));
+
+        // Start transmission (SYSTEM CONTROL = 0x0D)
+        uint8_t sys_ctrl[1] = {0x02}; // Set TXSTRT bit
+        dw1000_spi_write(spi_dev, 0x0D, sys_ctrl, sizeof(sys_ctrl));
+
+        // Wait for transmission completion (SYSTEM EVENT = 0x0F)
+        uint8_t sys_status[4] = {0};
+        do
         {
-            LOG_INF("SPI write to register TX_BUFFER successful");
-        }
+            dw1000_spi_read(spi_dev, 0x0F, sys_status, sizeof(sys_status));
+        } while (!(sys_status[0] & 0x80)); // Check TXFRS bit
 
-        // configure transmit frame
-        // address: TRANSMIT FRAME CONTROL(TX_FCTRL) = 0x08
-        // Configure preamble length (64), data rate (6.8Mbps), PRF(16MHz)
-        uint8_t tfc_data[3] = {0x07, 0xA0, 0x02};
+        LOG_INF("Transmission complete!");
 
-        ret = dw1000_spi_write(spi_dev, 0x08, tfc_data, sizeof(tfc_data));
-        if (ret == 0)
-        {
-            LOG_INF("SPI write to register TX_FCTRL successful");
-        }
+        // Clear TXFRS flag in SYSTEM EVENT (0x0F)
+        uint8_t clear_status[4] = {0x80, 0x00, 0x00, 0x00}; // Clear only TXFRS bit
+        dw1000_spi_write(spi_dev, 0x0F, clear_status, sizeof(clear_status));
 
-        // start transmission
-        // address: SYSTEM CONTROL (SYS_CTRL) = 0x0D
-        // Write the TXSTRT bit
-        LOG_INF("Starting SPI read in SYS_CTRL register so we don't modify any unwanted bits");
-        dw1000_spi_read(spi_dev, 0x0D, rx_data, sizeof(rx_data));
-        uint8_t go_data[4];
-        for (int i = 0; i < 3; ++i)
-        {
-            go_data[i] = rx_data[i];
-        }
-        go_data[0] = go_data[0] | 0x2;
-
-        ret = dw1000_spi_write(spi_dev, 0x0D, go_data, sizeof(go_data));
-        if (ret == 0)
-        {
-            LOG_INF("SPI write to register SYS_CTRL successful");
-        }
-
-        // wait for confirmation that the transmission ended
-        // address: SYSTEM EVENT (SYS_STATUS) = 0x0F
-        // Check the TXFRS bit (bit 7)
-        LOG_INF("Waiting for confirmation that the transmission ended...");
-        LOG_INF("ready bit?");
-        dw1000_spi_read(spi_dev, 0x0F, rx_data, sizeof(rx_data));
-        while ((rx_data[0] & 0x80) == 0)
-        {
-            LOG_INF("ready bit?");
-            dw1000_spi_read(spi_dev, 0x0F, rx_data, sizeof(rx_data));
-        }
-
-        LOG_INF("Transfer successful!");
-        LOG_INF("__________________________________________________________________");
-
-        for (int i = 0; i < 10000; ++i)
-            ;
+        k_msleep(SLEEP_TIME_MS);
     }
 
     return 0;
