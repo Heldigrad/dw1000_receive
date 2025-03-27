@@ -1,5 +1,7 @@
 //*********************************************/
-// TX
+// RX
+//https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
+//https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
 //*********************************************/
 
 #include <zephyr/kernel.h>
@@ -55,24 +57,51 @@ int dw1000_spi_write(const struct device *spi_dev, uint8_t reg, uint8_t *data, s
     return ret;
 }
 
+int dw1000_spi_subwrite(const struct device *spi_dev, uint8_t reg, uint8_t subreg, uint8_t *data, size_t len)
+{
+    uint8_t tx_buf[2 + len];        // (Header + address) + sub-address + data
+
+    tx_buf[0] = 0xC0 | reg;         // Op + address
+    tx_buf[1] = subreg;             // Sub-address
+    memcpy(&tx_buf[2], data, len);  // Data
+
+    struct spi_buf tx_bufs[] = {
+        {.buf = tx_buf, .len = sizeof(tx_buf)},
+    };
+
+    struct spi_buf_set tx = {.buffers = tx_bufs, .count = 1};
+
+    gpio_pin_set_dt(&cs_gpio, 0); // Assert CS
+    int ret = spi_write_dt(&spispec, &tx);
+    gpio_pin_set_dt(&cs_gpio, 1); // Deassert CS
+
+    if (ret) {
+        LOG_ERR("SPI sub-register write failed: %d", ret);
+    }
+    return ret;
+}
+
 int dw1000_spi_read(const struct device *spi_dev, uint8_t reg, uint8_t *data, size_t len)
 {
-    uint8_t tx_buf[2];
+    uint8_t tx_buf[1];
     tx_buf[0] = reg & 0x3F; // Read operation: MSB=0
-    tx_buf[1] = 0;
+    // tx_buf[1] = 0;
 
     struct spi_buf tx_bufs[] = {
         {.buf = &tx_buf, .len = 1}, // Send register address
     };
     struct spi_buf rx_bufs[] = {
+        {.buf = NULL, .len = 1},
         {.buf = data, .len = len}, // Receive data
     };
 
     struct spi_buf_set tx = {.buffers = tx_bufs, .count = 1};
-    struct spi_buf_set rx = {.buffers = rx_bufs, .count = 1};
+    struct spi_buf_set rx = {.buffers = rx_bufs, .count = 2};
 
     gpio_pin_set_dt(&cs_gpio, 0); // Assert CS
+    k_msleep(1);
     int ret = spi_transceive_dt(&spispec, &tx, &rx);
+    k_msleep(1);
     gpio_pin_set_dt(&cs_gpio, 1); // Deassert CS
 
     if (ret)
@@ -83,9 +112,9 @@ int dw1000_spi_read(const struct device *spi_dev, uint8_t reg, uint8_t *data, si
 
     // Log the received data
     LOG_INF("SPI read successful. Data from register 0x%X: ", reg);
-    for (size_t i = 1; i < len; i++)
+    for (size_t i = 0; i < len; i++)
     {
-        LOG_INF("Byte %zu: 0x%02X", i - 1, data[i]);
+        LOG_INF("Byte %zu: 0x%02X", i, data[i]);
     }
 
     return 0;
@@ -123,39 +152,56 @@ int main(void)
 
     while (1)
     {
-        LOG_INF("\n[TX]");
+        LOG_INF("\n[RX]");
 
-        // Read and verify Device ID
+        // Device ID
         uint8_t dev_id[4] = {0};
         dw1000_spi_read(spi_dev, 0x00, dev_id, sizeof(dev_id));
 
-        // Transmit Data
-        uint8_t tx_data[4] = {0xDE, 0xDE, 0xDE, 0xDE};             // Example payload
-        dw1000_spi_write(spi_dev, 0x09, tx_data, sizeof(tx_data)); // Write to TX_BUFFER (0x09)
-
-        uint8_t chan_ctrl[4] = {0x25, 0x00, 0x00, 0x00}; // Channel 5, Preamble Code 3
+        // CHAN_CTRL = 0x1F
+        uint8_t chan_ctrl[4] = {0x11, 0x00, 0x44, 0x08}; // Channel 1, preamble code 1
         dw1000_spi_write(spi_dev, 0x1F, chan_ctrl, sizeof(chan_ctrl));
 
-        // Configure transmission settings (TRANSMIT FRAME CONTROL = 0x08)
-        uint8_t tx_fctrl[4] = {0x06, 0x00, 0x42, 0x00}; // Correct frame length
-        dw1000_spi_write(spi_dev, 0x08, tx_fctrl, sizeof(tx_fctrl));
+        // DRX_TUNE0b = 0x27 : 02
+        uint8_t drx_tune0b[2] = {0x02, 0x00};
+        dw1000_spi_subwrite(spi_dev, 0x27, 0x02, drx_tune0b, sizeof(drx_tune0b));
 
-        // Start transmission (SYSTEM CONTROL = 0x0D)
-        uint8_t sys_ctrl[1] = {0x02}; // Set TXSTRT bit
+        // DRX_TUNE1a = 0x27 : 04
+        uint8_t drx_tune1a[2] = {0x87, 0x00};
+        dw1000_spi_subwrite(spi_dev, 0x27, 0x04, drx_tune1a, sizeof(drx_tune1a));
+
+        // DRX_TUNE1b = 0x27 : 06
+        uint8_t drx_tune1b[2] = {0x10, 0x00};
+        dw1000_spi_subwrite(spi_dev, 0x27, 0x06, drx_tune1b, sizeof(drx_tune1b));
+
+        // DRX_TUNE2 = 0x27 : 08
+        uint8_t drx_tune2[4] = {0x2D, 0x00, 0x1A, 0x31}; // PAC size = 8 
+        dw1000_spi_subwrite(spi_dev, 0x27, 0x08, drx_tune2, sizeof(drx_tune2));
+
+        // SYS_CTRL = 0x0D
+        uint8_t sys_ctrl[1] = {0x10}; 
         dw1000_spi_write(spi_dev, 0x0D, sys_ctrl, sizeof(sys_ctrl));
 
-        // Wait for transmission completion (SYSTEM EVENT = 0x0F)
+        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
+        { };
+
+
+        // Wait for a valid frame (RXFCG bit in SYS_STATUS)
         uint8_t sys_status[4] = {0};
         do
         {
             dw1000_spi_read(spi_dev, 0x0F, sys_status, sizeof(sys_status));
-        } while (!(sys_status[0] & 0x80)); // Check TXFRS bit
+        } while (!(sys_status[0] & (0x4000 | 0x42))); // Check RXFCG bit
 
-        LOG_INF("Transmission complete!");
+        // Read received data
+        uint8_t rx_data[4]; 
+        dw1000_spi_read(spi_dev, 0x11, rx_data, sizeof(rx_data));
 
-        // Clear TXFRS flag in SYSTEM EVENT (0x0F)
-        uint8_t clear_status[4] = {0x80, 0x00, 0x00, 0x00}; // Clear only TXFRS bit
-        dw1000_spi_write(spi_dev, 0x0F, clear_status, sizeof(clear_status));
+        LOG_INF("Received Data:");
+        for (size_t i = 0; i < sizeof(rx_data); i++)
+        {
+            LOG_INF("Byte %zu: 0x%02X", i, rx_data[i]);
+        }
 
         k_msleep(SLEEP_TIME_MS);
     }
