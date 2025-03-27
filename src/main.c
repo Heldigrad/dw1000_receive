@@ -1,7 +1,7 @@
 //*********************************************/
 // RX
-//https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
-//https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
+// https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
+// https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
 //*********************************************/
 
 #include <zephyr/kernel.h>
@@ -59,11 +59,11 @@ int dw1000_spi_write(const struct device *spi_dev, uint8_t reg, uint8_t *data, s
 
 int dw1000_spi_subwrite(const struct device *spi_dev, uint8_t reg, uint8_t subreg, uint8_t *data, size_t len)
 {
-    uint8_t tx_buf[2 + len];        // (Header + address) + sub-address + data
+    uint8_t tx_buf[2 + len]; // (Header + address) + sub-address + data
 
-    tx_buf[0] = 0xC0 | reg;         // Op + address
-    tx_buf[1] = subreg;             // Sub-address
-    memcpy(&tx_buf[2], data, len);  // Data
+    tx_buf[0] = 0xC0 | reg;        // Op + address
+    tx_buf[1] = subreg;            // Sub-address
+    memcpy(&tx_buf[2], data, len); // Data
 
     struct spi_buf tx_bufs[] = {
         {.buf = tx_buf, .len = sizeof(tx_buf)},
@@ -75,7 +75,8 @@ int dw1000_spi_subwrite(const struct device *spi_dev, uint8_t reg, uint8_t subre
     int ret = spi_write_dt(&spispec, &tx);
     gpio_pin_set_dt(&cs_gpio, 1); // Deassert CS
 
-    if (ret) {
+    if (ret)
+    {
         LOG_ERR("SPI sub-register write failed: %d", ret);
     }
     return ret;
@@ -175,36 +176,37 @@ int main(void)
         dw1000_spi_subwrite(spi_dev, 0x27, 0x06, drx_tune1b, sizeof(drx_tune1b));
 
         // DRX_TUNE2 = 0x27 : 08
-        uint8_t drx_tune2[4] = {0x2D, 0x00, 0x1A, 0x31}; // PAC size = 8 
+        uint8_t drx_tune2[4] = {0x2D, 0x00, 0x1A, 0x31}; // PAC size = 8
         dw1000_spi_subwrite(spi_dev, 0x27, 0x08, drx_tune2, sizeof(drx_tune2));
 
-        // SYS_CTRL = 0x0D
-        uint8_t sys_ctrl[1] = {0x10}; 
+        // SYS_CTRL = 0x0D -> start receiving
+        uint8_t sys_ctrl[2] = {0x00, 0x10};
         dw1000_spi_write(spi_dev, 0x0D, sys_ctrl, sizeof(sys_ctrl));
 
-        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
-        { };
-
-
         // Wait for a valid frame (RXFCG bit in SYS_STATUS)
-        uint8_t sys_status[4] = {0};
+        uint32_t sys_status = {0};
         do
         {
             dw1000_spi_read(spi_dev, 0x0F, sys_status, sizeof(sys_status));
-        } while (!(sys_status[0] & (0x4000 | 0x42))); // Check RXFCG bit
+        } while (!(sys_status & (0x24059000 | 0x4000))); // Check ERR bits | RXFCG bit
 
-        // Read received data
-        uint8_t rx_data[4]; 
-        dw1000_spi_read(spi_dev, 0x11, rx_data, sizeof(rx_data));
-
-        LOG_INF("Received Data:");
-        for (size_t i = 0; i < sizeof(rx_data); i++)
+        if (sys_status & 0x4000)
         {
-            LOG_INF("Byte %zu: 0x%02X", i, rx_data[i]);
+            // Read received data
+            LOG_INF("Received Data:");
+            uint8_t rx_data[4];
+            dw1000_spi_read(spi_dev, 0x11, rx_data, sizeof(rx_data));
+
+            // Clear status bit
+            dw1000_spi_write(spi_dev, 0x0F, 0x4000, sizeof(0x4000));
+        }
+        else
+        {
+            // Clear err bits
+            dw1000_spi_write(spi_dev, 0x0F, 0x24059000, sizeof(0x24059000));
         }
 
         k_msleep(SLEEP_TIME_MS);
-    }
 
-    return 0;
-}
+        return 0;
+    }
