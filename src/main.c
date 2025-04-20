@@ -22,7 +22,7 @@ int main(void)
 
     while (1)
     {
-        LOG_INF("\n[RX]");
+        LOG_INF("SIMPLE_RX");
 
         // Device ID
         uint32_t dev_id;
