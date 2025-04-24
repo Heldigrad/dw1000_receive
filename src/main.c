@@ -20,14 +20,22 @@ int main(void)
     // uint8_t softreset = 0x00;
     // dw1000_subwrite_u8(PMSC, 0x04, softreset);
 
-    // initialize();
-    dw1000_default_config();
+    // generic_default_configs();
+    // rx_default_configs();
+    // additional_default_configs();
 
+    // initialize();
     // configure();
 
     while (1)
     {
         LOG_INF("SIMPLE_RX");
+
+        reset_devices();
+
+        generic_default_configs();
+        rx_default_configs();
+        additional_default_configs();
 
         // Device ID
         uint32_t dev_id;
@@ -43,7 +51,7 @@ int main(void)
         tx_fctrl |= (1 << 20);  // PE = 01
         tx_fctrl |= (0 << 22);  // TXBOFFS = 0x000
 
-        dw1000_write_u32(TX_FCTRL, tx_fctrl);
+        // dw1000_write_u32(TX_FCTRL, tx_fctrl);
 
         rx_enable();
 
