@@ -16,42 +16,20 @@ int main(void)
     gpio_pin_configure_dt(&reset_gpio, GPIO_OPEN_DRAIN | GPIO_OUTPUT);
     reset_devices();
 
-    // soft reset
-    // uint8_t softreset = 0x00;
-    // dw1000_subwrite_u8(PMSC, 0x04, softreset);
-
-    // generic_default_configs();
-    // rx_default_configs();
-    // additional_default_configs();
-
-    // initialize();
-    // configure();
-
     while (1)
     {
-        LOG_INF("SIMPLE_RX");
+        LOG_INF("\n\n");
+        LOG_INF("RX");
+
+        // Device ID
+        // uint32_t dev_id;
+        // dw1000_read_u32(0x00, &dev_id);
 
         reset_devices();
 
-        generic_default_configs();
+        generic_default_configs(4);
         rx_default_configs();
         additional_default_configs();
-
-        // Device ID
-        uint32_t dev_id;
-        dw1000_read_u32(0x00, &dev_id);
-
-        uint32_t tx_fctrl = 0;
-        tx_fctrl |= (6 & 0x7F); // TFLEN
-        tx_fctrl |= (0 << 7);   // TFLE = 0
-        tx_fctrl |= (0 << 10);  // Reserved = 0
-        tx_fctrl |= (2 << 13);  // TXBR = 10 (6.8 Mbps)
-        tx_fctrl |= (1 << 16);  // TXPRF = 01 (16 MHz)
-        tx_fctrl |= (1 << 18);  // TXPSR = 01
-        tx_fctrl |= (1 << 20);  // PE = 01
-        tx_fctrl |= (0 << 22);  // TXBOFFS = 0x000
-
-        // dw1000_write_u32(TX_FCTRL, tx_fctrl);
 
         rx_enable();
 
@@ -60,24 +38,56 @@ int main(void)
         do
         {
             dw1000_read_u32(SYS_STATUS, &sys_status);
-            k_msleep(100);
+            k_msleep(10);
         } while (!(sys_status & (SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR))); // Check ERR bits | RXFCG bit
 
-        if (sys_status & SYS_STATUS_RX_OK)
+        if (sys_status & SYS_STATUS_RXFCG)
         {
             // Read received data
-            LOG_INF("Reception success!\nReceived Data:");
+            uint64_t T2 = get_rx_timestamp();
+            LOG_INF("Reception success! T2 = %X", T2);
             uint32_t rx_data;
             dw1000_read_u32(0x11, &rx_data);
 
+            if (rx_data == POLL_MSG)
+            {
+                LOG_INF("Ranging initiated!");
+            }
+
             // Clear status bit
-            LOG_INF("Clearing status bit...");
+            // LOG_INF("Clearing status bit...");
             dw1000_write_u32(SYS_STATUS, SYS_STATUS_RXFCG);
+            k_msleep(1);
+            // Send response with RX timestamp
+            // reset_devices();
+
+            // generic_default_configs(5);
+            // tx_default_configs();
+            // // additional_default_configs();
+
+            // // Send a message with the T2 buffer
+            // dw1000_write_u32(TX_BUFFER, T2);
+
+            // tx_start();
+
+            // // SYSTEM EVENT = 0x0F -> wait for transmission completion
+            // uint32_t sys_status_1;
+            // do
+            // {
+            //     dw1000_read_u32(SYS_STATUS, &sys_status_1);
+            //     k_msleep(10);
+            // } while (!(sys_status_1 & SYS_STATUS_TXFRS)); // Check TXFRS bit
+
+            // uint64_t T3 = get_tx_timestamp();
+            // LOG_INF("Transmission complete! T3 = %X", T3);
+
+            // // SYSTEM EVENT = 0x0F -> clear TXFRS flag
+            // dw1000_write_u32(SYS_STATUS, SYS_STATUS_TXFRS);
         }
         else
         {
             // Clear err bits
-            LOG_INF("Clearing err bits...");
+            LOG_INF("Reception failed. Resend message! Clearing err bits...");
             dw1000_write_u32(SYS_STATUS, SYS_STATUS_ALL_RX_ERR);
         }
 
