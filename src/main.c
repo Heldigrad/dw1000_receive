@@ -31,33 +31,36 @@ int main(void)
         rx_default_configs();
         additional_default_configs();
 
+        load_lde_microcode();
         rx_enable();
 
         // Wait for a valid frame (RXFCG bit in SYS_STATUS)
-        uint32_t sys_status = {0};
+        uint32_t sys_status = 0;
         do
         {
-            dw1000_read_u32(SYS_STATUS, &sys_status);
             k_msleep(10);
-        } while (!(sys_status & (SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR))); // Check ERR bits | RXFCG bit
+            dw1000_read_u32(SYS_STATUS, &sys_status);
+        } while (!(sys_status & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))); // Check ERR bits | RXFCG bit
 
         if (sys_status & SYS_STATUS_RXFCG)
         {
             // Read received data
             uint64_t T2 = get_rx_timestamp();
-            LOG_INF("Reception success! T2 = %X", T2);
+            LOG_INF("RX success! T2 = %08llX", T2);
             uint32_t rx_data;
-            dw1000_read_u32(0x11, &rx_data);
+            dw1000_read_u32(RX_BUFFER, &rx_data);
 
             if (rx_data == POLL_MSG)
             {
                 LOG_INF("Ranging initiated!");
             }
 
+            rx_data = 0;
+
             // Clear status bit
             // LOG_INF("Clearing status bit...");
-            dw1000_write_u32(SYS_STATUS, SYS_STATUS_RXFCG);
-            k_msleep(1);
+            dw1000_write_u32(SYS_STATUS, SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR);
+
             // Send response with RX timestamp
             // reset_devices();
 
@@ -88,11 +91,14 @@ int main(void)
         {
             // Clear err bits
             LOG_INF("Reception failed. Resend message! Clearing err bits...");
-            dw1000_write_u32(SYS_STATUS, SYS_STATUS_ALL_RX_ERR);
+            dw1000_write_u32(SYS_STATUS, SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR);
         }
-
+        rx_soft_reset();
         k_msleep(SLEEP_TIME_MS);
     }
 
     return 0;
 }
+
+// vezi rx reset pg 34 la final
+// set ldeload bit pg 163
