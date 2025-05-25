@@ -2,9 +2,10 @@
 // RX
 // https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
 // https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
+// https:// github.com/foldedtoad/dwm1001/tree/master
 //*********************************************/
 
-#include "C:\Users\agape\Documents\LICENTA\dw1000_app\DW1000-driver\includes.h"
+#include "C:\Users\agape\Documents\LICENTA\functions\includes.h"
 
 int main(void)
 {
@@ -28,11 +29,11 @@ int main(void)
 
         // dw1000_read_u32(0x00, &dev_id);
 
-        stolen_init();
+        new_init();
 
         dw1000_read_u32(0x00, &dev_id);
 
-        stolen_configure();
+        new_configure();
 
         dw1000_read_u32(0x00, &dev_id);
 
@@ -40,10 +41,12 @@ int main(void)
 
         dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
 
+        load_lde_microcode();
+
         while (1)
         {
-            buffer = 0;
-            stolen_rx_enable(0);
+
+            new_rx_enable(0);
 
             dw1000_read_u32(SYS_STATUS, &status_reg);
             while (!(status_reg & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
@@ -51,16 +54,13 @@ int main(void)
                 dw1000_read_u32(SYS_STATUS, &status_reg);
             };
 
-            if (status_reg & SYS_STATUS_RXFCG)
+            if (!(status_reg & SYS_STATUS_ALL_RX_ERR))
             {
-
-                print_enabled_bits(status_reg);
-
                 uint64_t T2 = get_rx_timestamp();
-                /* A frame has been received, copy it to our local buffer. */
+                LOG_INF("RX success! T2 = %08llX", T2);
                 dw1000_read_u32(RX_BUFFER, &buffer);
 
-                LOG_INF("RX success! T2 = %08llX", T2);
+                print_enabled_bits(status_reg);
 
                 /* Clear good RX frame event in the DW1000 status register. */
                 dw1000_write_u32(SYS_STATUS, SYS_STATUS_RXFCG);
@@ -68,12 +68,18 @@ int main(void)
             else
             {
                 LOG_INF("Errors encountered!");
+                print_enabled_bits(status_reg);
+
+                uint64_t T2 = get_rx_timestamp();
+                LOG_INF("T2 = %08llX", T2);
+
                 /* Clear RX error events in the DW1000 status register. */
                 dw1000_write_u32(SYS_STATUS, SYS_STATUS_ALL_RX_ERR);
+                rx_soft_reset();
             }
 
-            rx_soft_reset();
-            k_msleep(RX_SLEEP_TIME_MS);
+            //  k_msleep(RX_SLEEP_TIME_MS);
+            LOG_INF("\n\n");
         }
 
         // dw1000_read_u32(0x00, &dev_id);
