@@ -2,11 +2,11 @@
 // RX
 // https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
 // https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
-// https:// github.com/foldedtoad/dwm1001/tree/master
+// https://github.com/foldedtoad/dwm1001/tree/master
 //*********************************************/
 
-#include "C:\Users\agape\Documents\LICENTA\functions\includes.h" // on laptop
-// #include "C:\Users\agape\Documents\LICENTA\dw1000_app\DW1000-driver\includes.h" // on PC
+#include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
+#include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
 
 int main(void)
 {
@@ -18,143 +18,69 @@ int main(void)
     gpio_pin_configure_dt(&reset_gpio, GPIO_OPEN_DRAIN | GPIO_OUTPUT);
     reset_devices();
 
+    LOG_INF("RX");
+
     bip_init();
     bip_config();
 
-    // load_lde_microcode();
-
-    uint32_t buffer, status_reg;
-    dw1000_read_u32(SYS_STATUS, &status_reg);
-    LOG_INF("SYS_STATUS = 0x%0X", status_reg);
+    uint64_t buffer, T2, T3, aux;
     dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
 
-    while (1)
+    int ok = 1;
+
+    dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
+    dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
+
+    // while (1)
     {
-
-        dw1000_write_u32(RX_BUFFER, 0x00);
-
         LOG_INF("\n\n");
-        LOG_INF("RX");
 
-        new_rx_enable(0);
-
-        dw1000_read_u32(SYS_STATUS, &status_reg);
-        while (!(status_reg & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
+        if (receive(&buffer, &T2) == SUCCESS)
         {
-            dw1000_read_u32(SYS_STATUS, &status_reg);
-        };
+            LOG_INF("RX Success!");
 
-        if (!(status_reg & SYS_STATUS_ALL_RX_ERR))
-        {
-            uint64_t T2 = get_rx_timestamp();
-            LOG_INF("RX success! T2 = %08llX", T2);
-            dw1000_read_u32(RX_BUFFER, &buffer);
+            uint8_t frame_len;
+            dw1000_read_u8(RX_FINFO, &frame_len);
+            frame_len &= 0x7F;
+            LOG_INF("Received frame length is %d", frame_len);
 
-            print_enabled_bits(status_reg);
-
-            /* Clear good RX frame event in the DW1000 status register. */
-            dw1000_write_u32(SYS_STATUS, SYS_STATUS_RXFCG);
+            if (buffer == POLL_MSG)
+            {
+                LOG_INF("Poll message received! Sending timestamp 2.");
+                if (transmit(T2, 5, &T3) == SUCCESS)
+                {
+                    LOG_INF("Response transmitted successfully! Sending Treply...");
+                    if (transmit(T3, 5, &aux) == SUCCESS)
+                    {
+                        LOG_INF("All messages were transmitted.");
+                    }
+                    else
+                    {
+                        ok = 0;
+                    }
+                }
+                else
+                {
+                    ok = 0;
+                }
+            }
+            else
+            {
+                ok = 0;
+            }
         }
         else
         {
-            uint64_t T2 = get_rx_timestamp();
+            ok = 0;
+        }
 
-            LOG_INF("Errors encountered!");
-            print_enabled_bits(status_reg);
-
-            LOG_INF("T2 = %08llX", T2);
-
-            dw1000_read_u32(RX_BUFFER, &buffer);
-
-            /* Clear RX error events in the DW1000 status register. */
-            dw1000_write_u32(SYS_STATUS, SYS_STATUS_ALL_RX_ERR);
-            rx_soft_reset();
+        if (ok == 0)
+        {
+            LOG_INF("Something went wrong. Please try again!");
         }
 
         //  k_msleep(RX_SLEEP_TIME_MS);
     }
 
-    // dw1000_read_u32(0x00, &dev_id);
-
-    // generic_default_configs(4);
-    // rx_default_configs();
-    // additional_default_configs();
-
-    // rx_gipi();
-    // lde_microcode_gipi();
-
-    // dw1000_write_u32(RX_BUFFER, 0);
-
-    // load_lde_microcode();
-
-    // rx_start_gipi();
-
-    // // Wait for a valid frame (RXFCG bit in SYS_STATUS)
-    // uint32_t sys_status = 0;
-    // do
-    // {
-    //     k_msleep(10);
-    //     dw1000_read_u32(SYS_STATUS, &sys_status);
-    // } while (!(sys_status & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))); // Check ERR bits | RXFCG bit
-
-    // print_enabled_bits(sys_status);
-
-    // if (sys_status & SYS_STATUS_RXFCG)
-    // {
-    //     // Read received data
-    //     uint64_t T2 = get_rx_timestamp();
-    //     LOG_INF("RX success! T2 = %08llX", T2);
-    //     uint32_t rx_data;
-    //     dw1000_read_u32(RX_BUFFER, &rx_data);
-
-    //     if (rx_data == POLL_MSG)
-    //     {
-    //         LOG_INF("Ranging initiated!");
-    //     }
-
-    //     rx_data = 0;
-
-    //     // Clear status bit
-    //     // LOG_INF("Clearing status bit...");
-    //     dw1000_write_u32(SYS_STATUS, SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR);
-
-    // Send response with RX timestamp
-    // reset_devices();
-
-    // generic_default_configs(5);
-    // tx_default_configs();
-    // // additional_default_configs();
-
-    // // Send a message with the T2 buffer
-    // dw1000_write_u32(TX_BUFFER, T2);
-
-    // tx_start();
-
-    // // SYSTEM EVENT = 0x0F -> wait for transmission completion
-    // uint32_t sys_status_1;
-    // do
-    // {
-    //     dw1000_read_u32(SYS_STATUS, &sys_status_1);
-    //     k_msleep(10);
-    // } while (!(sys_status_1 & SYS_STATUS_TXFRS)); // Check TXFRS bit
-
-    // uint64_t T3 = get_tx_timestamp();
-    // LOG_INF("Transmission complete! T3 = %X", T3);
-
-    // // SYSTEM EVENT = 0x0F -> clear TXFRS flag
-    // dw1000_write_u32(SYS_STATUS, SYS_STATUS_TXFRS);
-    // }
-    // else
-    // {
-    //     // Clear err bits
-    //     LOG_INF("Reception failed. Resend message! Clearing err bits...");
-    //     dw1000_write_u32(SYS_STATUS, SYS_STATUS_RX_OK | SYS_STATUS_ALL_RX_ERR);
-    // }
-    // rx_soft_reset();
-    // k_msleep(RX_SLEEP_TIME_MS);
-
     return 0;
 }
-
-// vezi rx reset pg 34 la final
-// set ldeload bit pg 163
