@@ -23,6 +23,9 @@ int main(void)
     bip_init();
     bip_config();
 
+    set_rx_antenna_delay(RX_ANT_DLY);
+    set_tx_antenna_delay(TX_ANT_DLY);
+
     uint64_t buffer, T2, T3, aux;
     dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
 
@@ -31,7 +34,7 @@ int main(void)
     dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
     dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
 
-    // while (1)
+    while (1)
     {
         LOG_INF("\n\n");
 
@@ -39,44 +42,30 @@ int main(void)
         {
             LOG_INF("RX Success!");
 
-            uint8_t frame_len;
-            dw1000_read_u8(RX_FINFO, &frame_len);
-            frame_len &= 0x7F;
-            LOG_INF("Received frame length is %d", frame_len);
-
             if (buffer == POLL_MSG)
             {
                 LOG_INF("Poll message received! Sending timestamp 2.");
                 if (transmit(T2, 5, &T3) == SUCCESS)
                 {
-                    LOG_INF("Response transmitted successfully! Sending Treply...");
+                    LOG_INF("Response transmitted successfully! Sending T3...");
                     if (transmit(T3, 5, &aux) == SUCCESS)
                     {
                         LOG_INF("All messages were transmitted.");
                     }
                     else
                     {
-                        ok = 0;
+                        continue;
                     }
                 }
                 else
                 {
-                    ok = 0;
+                    continue;
                 }
             }
             else
             {
-                ok = 0;
+                continue;
             }
-        }
-        else
-        {
-            ok = 0;
-        }
-
-        if (ok == 0)
-        {
-            LOG_INF("Something went wrong. Please try again!");
         }
 
         //  k_msleep(RX_SLEEP_TIME_MS);
