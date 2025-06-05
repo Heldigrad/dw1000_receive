@@ -5,8 +5,11 @@
 // https://github.com/foldedtoad/dwm1001/tree/master
 //*********************************************/
 
-#include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
-#include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
+// #include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
+// #include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
+
+#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
+#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
 int main(void)
 {
@@ -29,42 +32,30 @@ int main(void)
     uint64_t buffer, T2, T3, aux;
     dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
 
-    int ok = 1;
-
     dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
     dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
 
-    while (1)
+    for (int i = 0; i < 10; ++i)
     {
         LOG_INF("\n\n");
 
         if (receive(&buffer, &T2) == SUCCESS)
         {
-            LOG_INF("RX Success!");
-
             if (buffer == POLL_MSG)
             {
-                LOG_INF("Poll message received! Sending timestamp 2.");
-                if (transmit(T2, 5, &T3) == SUCCESS)
-                {
-                    LOG_INF("Response transmitted successfully! Sending T3...");
-                    if (transmit(T3, 5, &aux) == SUCCESS)
-                    {
-                        LOG_INF("All messages were transmitted.");
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    continue;
-                }
-            }
-            else
-            {
-                continue;
+                /* Compute final message transmission time. See NOTE 7 below. */
+                T3 = (T2 + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+
+                // set_delayed_trx_time(T3);
+
+                /* Response TX timestamp is the transmission time we
+                 * programmed plus the antenna delay.
+                 */
+                T3 = (((uint64_t)(T3 & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+
+                transmit(T2, 5, &aux);
+                k_msleep(RX_SLEEP_TIME_MS);
+                transmit(T3, 5, &aux);
             }
         }
 
