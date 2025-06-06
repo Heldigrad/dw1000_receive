@@ -26,30 +26,48 @@ int main(void)
     set_rx_antenna_delay(RX_ANT_DLY);
     set_tx_antenna_delay(TX_ANT_DLY);
 
-    uint64_t buffer, T2, T3, aux;
+    double distance;
+    uint64_t buffer, T1, T2, T3, T4, aux;
     dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
-
-    dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
-    dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
 
     while (1)
     {
-        LOG_INF("\n\n");
+        dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
+        dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
 
         if (receive(&buffer, &T2) == SUCCESS)
         {
 
             if (buffer == POLL_MSG)
             {
-                transmit(T2, 5, &T3);
-                if (receive(&buffer, &aux) == SUCCESS) // confirmation
+                transmit(0x1020304050, 5, &T3);
+
+                uint32_t status_reg;
+                dw1000_write_u32(SYS_STATUS, 0xFFFFFFFF);
+
+                new_rx_enable(0);
+
+                do
                 {
-                    if (buffer == 0xA987654321)
-                        transmit(T3, 5, &aux);
+                    dw1000_read_u32(SYS_STATUS, &status_reg);
+                } while (!(status_reg & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)));
+
+                if (!(status_reg & SYS_STATUS_ALL_RX_ERR) && (status_reg & SYS_STATUS_RXFCG))
+                {
+                    dw1000_subread_u40(RX_BUFFER, 0x00, &T1);
+                    dw1000_subread_u40(RX_BUFFER, 0x05, &T4);
+                    distance = compute_distance(T1, T2, T3, T4);
+                    LOG_INF("T1 = %llX, T2 = %llX, T3 = %llX, T4 = %llX, Distance = %f m", T1, T2, T3, T4, distance);
+                    /* Clear good RX frame event in the DW1000 status register. */
+                    dw1000_write_u32(SYS_STATUS, SYS_STATUS_RXFCG);
+                }
+                else
+                {
+                    /* Clear RX error events in the DW1000 status register. */
+                    dw1000_write_u32(SYS_STATUS, SYS_STATUS_ALL_RX_ERR);
+                    rx_soft_reset();
                 }
             }
         }
     }
-
-    return 0;
 }
