@@ -11,6 +11,8 @@
 #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
 #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
+double distances[NR_OF_DISTANCES];
+
 int main(void)
 {
     if (check_devices_ready())
@@ -21,7 +23,7 @@ int main(void)
     gpio_pin_configure_dt(&reset_gpio, GPIO_OPEN_DRAIN | GPIO_OUTPUT);
     reset_devices();
 
-    LOG_INF("RX");
+    LOG_INF("RESP");
 
     bip_init();
     bip_config();
@@ -30,7 +32,7 @@ int main(void)
     set_tx_antenna_delay(TX_ANT_DLY);
 
     double distance, sum = 0;
-    uint64_t T1, T2, T3, T4;
+    uint64_t T1, T2, T3, T4, aux;
     int count;
     while (1)
     {
@@ -49,17 +51,28 @@ int main(void)
             get_msg_from_init(&T1, &T2, &T3, &T4);
         } while (T1 == 0 || T2 == 0 || T3 == 0 || T4 == 0);
 
-        distance = compute_distance(T1, T2, T3, T4);
-        if (distance < 100) // Dist > 100 suggests an error occured
+        // LOG_INF("T1 = %0llX, T2 = %0llX, T3 = %0llX, T4 = %0llX", T1, T2, T3, T4);
+
+        distance = compute_distance_meters(T1, T2, T3, T4);
+        if (distance < 100 && distance > 0.3) // Dist > 100 suggests an error occured
         {
-            LOG_INF("Distance = %0f", distance);
-            sum += distance;
+            // LOG_INF("Distance = %0f", distance);
+            distances[count] = distance;
             count++;
-            if (count == 10)
+            if (count == NR_OF_DISTANCES)
             {
-                LOG_INF("Distance = %0f", sum / count);
+                distance = mean_distance(distances);
+                LOG_INF("Estimated distance = %0f", distance);
+
+                // k_msleep(2);
+
+                transmit(distance, 8, &aux);
+                transmit(distance, 8, &aux);
+                transmit(distance, 8, &aux);
+                transmit(distance, 8, &aux);
+                transmit(distance, 8, &aux);
+
                 count = 0;
-                sum = 0;
             }
         }
     }
