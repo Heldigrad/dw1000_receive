@@ -11,7 +11,6 @@
 #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
 #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
-double distances[NR_OF_DISTANCES];
 uint8_t Dev_id = 0x01;
 
 int main(void)
@@ -48,7 +47,7 @@ int main(void)
 
         do
         {
-            get_msg_from_init(&T1, &T2, &T3, &T4, &msg_id);
+            get_msg_from_init(Dev_id, &T1, &T2, &T3, &T4, &msg_id);
         } while (T1 == 0 || T2 == 0 || T3 == 0 || T4 == 0);
 
         if (INFO_LOGS_EN)
@@ -60,7 +59,9 @@ int main(void)
 
         if (distance < 100 && distance > 0.2)
         {
-            LOG_INF("Distance nr. %0d = %0f", msg_id, distance);
+            k_msleep(1);
+
+            LOG_INF("Distance nr. %0d = %0.2fm", msg_id, distance);
 
             uint32_t distance_mm = (uint32_t)(distance * 1000.0);
 
