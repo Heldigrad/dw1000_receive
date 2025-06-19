@@ -12,6 +12,7 @@
 #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
 double distances[NR_OF_DISTANCES];
+uint8_t Dev_id = 0x01;
 
 int main(void)
 {
@@ -31,10 +32,10 @@ int main(void)
     set_rx_antenna_delay(RX_ANT_DLY);
     set_tx_antenna_delay(TX_ANT_DLY);
 
-    double distance, sum = 0;
-    uint64_t T1, T2, T3, T4, aux;
+    double distance;
+    uint64_t T1, T2, T3, T4;
     uint8_t msg_id = 0;
-    int count;
+
     while (1)
     {
         dw1000_write_u8(SYS_CTRL, SYS_CTRL_TRXOFF);
@@ -60,6 +61,10 @@ int main(void)
         if (distance < 100 && distance > 0.2)
         {
             LOG_INF("Distance nr. %0d = %0f", msg_id, distance);
+
+            uint32_t distance_mm = (uint32_t)(distance * 1000.0);
+
+            send_distance(Dev_id, distance_mm);
         }
     }
 }
