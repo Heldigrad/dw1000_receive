@@ -33,6 +33,7 @@ int main(void)
 
     double distance, sum = 0;
     uint64_t T1, T2, T3, T4, aux;
+    uint8_t msg_id = 0;
     int count;
     while (1)
     {
@@ -43,37 +44,22 @@ int main(void)
         T2 = 0;
         T3 = 0;
         T4 = 0;
-        // uint32_t dev_id;
-        // dw1000_subread_u32(0x00, 0x00, &dev_id);
-        // LOG_INF("Test: %X", dev_id);
+
         do
         {
-            get_msg_from_init(&T1, &T2, &T3, &T4);
+            get_msg_from_init(&T1, &T2, &T3, &T4, &msg_id);
         } while (T1 == 0 || T2 == 0 || T3 == 0 || T4 == 0);
 
-        // LOG_INF("T1 = %0llX, T2 = %0llX, T3 = %0llX, T4 = %0llX", T1, T2, T3, T4);
+        if (INFO_LOGS_EN)
+        {
+            LOG_INF("T1 = %0llX, T2 = %0llX, T3 = %0llX, T4 = %0llX", T1, T2, T3, T4);
+        }
 
         distance = compute_distance_meters(T1, T2, T3, T4);
-        if (distance < 100 && distance > 0.3) // Dist > 100 suggests an error occured
+
+        if (distance < 100 && distance > 0.2)
         {
-            // LOG_INF("Distance = %0f", distance);
-            distances[count] = distance;
-            count++;
-            if (count == NR_OF_DISTANCES)
-            {
-                distance = mean_distance(distances);
-                LOG_INF("Estimated distance = %0f", distance);
-
-                // k_msleep(2);
-
-                transmit(distance, 8, &aux);
-                transmit(distance, 8, &aux);
-                transmit(distance, 8, &aux);
-                transmit(distance, 8, &aux);
-                transmit(distance, 8, &aux);
-
-                count = 0;
-            }
+            LOG_INF("Distance nr. %0d = %0f", msg_id, distance);
         }
     }
 }
