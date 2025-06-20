@@ -5,13 +5,13 @@
 // https://github.com/foldedtoad/dwm1001/tree/master
 //**/
 
-#include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
-#include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
+// #include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
+// #include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
 
-// #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
-// #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
+#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
+#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
-uint8_t Dev_id = 0x02;
+uint8_t Dev_id = 0x04;
 
 int main(void)
 {
@@ -28,8 +28,7 @@ int main(void)
     bip_init();
     bip_config();
 
-    set_rx_antenna_delay(RX_ANT_DLY);
-    set_tx_antenna_delay(TX_ANT_DLY);
+    set_antenna_delay(Dev_id);
 
     double distance;
     uint64_t T1, T2, T3, T4;
@@ -61,7 +60,10 @@ int main(void)
         {
             k_msleep(10);
 
-            LOG_INF("Distance nr. %0d = %0.2fm", msg_id, distance);
+            if (INFO_LOGS_EN)
+            {
+                LOG_INF("Distance nr. %0d = %0.2fm", msg_id, distance);
+            }
 
             uint32_t distance_mm = (uint32_t)(distance * 1000.0);
 
