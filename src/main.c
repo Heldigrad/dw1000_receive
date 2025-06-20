@@ -5,13 +5,13 @@
 // https://github.com/foldedtoad/dwm1001/tree/master
 //**/
 
-// #include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
-// #include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
+#include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
+#include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
 
-#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
-#include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
+// #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
+// #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
-uint8_t Dev_id = 0x01;
+uint8_t Dev_id = 0x02;
 
 int main(void)
 {
@@ -23,7 +23,7 @@ int main(void)
     gpio_pin_configure_dt(&reset_gpio, GPIO_OPEN_DRAIN | GPIO_OUTPUT);
     reset_devices();
 
-    LOG_INF("RESP");
+    LOG_INF("RESPONDER %0d", Dev_id);
 
     bip_init();
     bip_config();
@@ -57,9 +57,9 @@ int main(void)
 
         distance = compute_distance_meters(T1, T2, T3, T4);
 
-        if (distance < 100 && distance > 0.2)
+        // if (distance < 100 && distance > 0.2)
         {
-            k_msleep(1);
+            k_msleep(10);
 
             LOG_INF("Distance nr. %0d = %0.2fm", msg_id, distance);
 
