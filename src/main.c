@@ -43,6 +43,9 @@ int main(void)
         T3 = 0;
         T6 = 0;
 
+        dw1000_subwrite_u40(RX_TIME, 0x00, 0x00);
+        dw1000_subwrite_u40(TX_TIME, 0x00, 0x00);
+
         while (1)
         {
             get_msg_from_init(Dev_id, &T2, &T3, &T6, &msg_id);
