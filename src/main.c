@@ -1,9 +1,11 @@
-//**/
-// RX
-// https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
-// https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
-// https://github.com/foldedtoad/dwm1001/tree/master
-//**/
+/*
+RX
+https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
+https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
+https://github.com/foldedtoad/dwm1001/tree/master
+
+https : // www.sciencedirect.com/science/article/pii/S026322412400544X#s0010
+*/
 
 #include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
 #include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
@@ -30,7 +32,6 @@ int main(void)
 
     set_antenna_delay(Dev_id);
 
-    double distance;
     uint64_t T2, T3, T6;
     uint8_t msg_id = 0;
 
