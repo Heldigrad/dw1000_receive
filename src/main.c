@@ -13,7 +13,7 @@ https : // www.sciencedirect.com/science/article/pii/S026322412400544X#s0010
 // #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\devices.h"
 // #include "C:\Users\agape\Documents\LICENTA\dw1000_app\functions\dw1000_ranging_functions.h"
 
-uint8_t Dev_id = 0x01;
+uint8_t Dev_id = 0x04;
 
 int main(void)
 {
