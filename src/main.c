@@ -1,12 +1,3 @@
-/*
-RX
-https://github.com/RT-LOC/zephyr-dwm1001/blob/master/examples/ex_02a_simple_rx/ex_02a_main.c
-https://github.com/zephyrproject-rtos/zephyr/blob/main/drivers/ieee802154/ieee802154_dw1000.c
-https://github.com/foldedtoad/dwm1001/tree/master
-
-https : // www.sciencedirect.com/science/article/pii/S026322412400544X#s0010
-*/
-
 #include "C:\Users\agape\Documents\LICENTA\functions\devices.h"
 #include "C:\Users\agape\Documents\LICENTA\functions\dw1000_ranging_functions.h"
 
@@ -27,8 +18,8 @@ int main(void)
 
     LOG_INF_IF_ENABLED("RESPONDER %0d", Dev_id);
 
-    bip_init();
-    bip_config();
+    initialize();
+    configure();
 
     set_antenna_delay(Dev_id);
 
